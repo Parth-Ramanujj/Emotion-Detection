@@ -1,6 +1,6 @@
-import streamlit as st
-from streamlit_webrtc import webrtc_streamer
 import av
+import streamlit as st
+from streamlit_webrtc import webrtc_streamer, WebRtcMode, ClientSettings
 from utils import process_frame
 
 st.set_page_config(page_title="Live Emotion Detection", page_icon="🙂", layout="centered")
@@ -18,8 +18,11 @@ def video_frame_callback(frame: av.VideoFrame) -> av.VideoFrame:
 
 webrtc_streamer(
     key="emotion-detection",
+    mode=WebRtcMode.SENDRECV,
     video_frame_callback=video_frame_callback,
+    media_stream_constraints={"video": True, "audio": False},
     rtc_configuration={
         "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
-    }
+    },
+    async_processing=True
 )
