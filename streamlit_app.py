@@ -1,6 +1,6 @@
 import av
 import streamlit as st
-from streamlit_webrtc import webrtc_streamer, WebRtcMode, ClientSettings
+from streamlit_webrtc import webrtc_streamer, WebRtcMode
 from utils import process_frame
 
 st.set_page_config(page_title="Live Emotion Detection", page_icon="🙂", layout="centered")
