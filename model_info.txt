@@ -1,0 +1,1 @@
+Input: (None, 64, 64, 1), Output: (None, 7)
