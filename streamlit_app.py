@@ -16,11 +16,16 @@ def video_frame_callback(frame: av.VideoFrame) -> av.VideoFrame:
     
     return av.VideoFrame.from_ndarray(processed_img, format="bgr24")
 
+st.markdown("<small style='color: grey;'>*Note for iPhone Users: Do not open this link from WhatsApp/Instagram. Open it directly in the **Safari** app, otherwise the camera will not load.*</small>", unsafe_allow_html=True)
+
 webrtc_streamer(
     key="emotion-detection",
     mode=WebRtcMode.SENDRECV,
     video_frame_callback=video_frame_callback,
-    media_stream_constraints={"video": True, "audio": False},
+    media_stream_constraints={
+        "video": {"facingMode": "user"}, 
+        "audio": False
+    },
     rtc_configuration={
         "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
     },
