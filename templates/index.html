@@ -36,12 +36,19 @@
             background-color: #000;
             max-width: 800px;
             width: 100%;
+            position: relative;
         }
 
-        .video-container img {
+        video {
+            display: none;
+            /* We only show the processed image */
+        }
+
+        img {
             max-width: 100%;
             height: auto;
             display: block;
+            width: 100%;
         }
 
         .info {
@@ -49,6 +56,11 @@
             text-align: center;
             color: #aaa;
             font-size: 0.9rem;
+            max-width: 600px;
+        }
+
+        #status {
+            color: #ffcc00;
         }
     </style>
 </head>
@@ -57,13 +69,93 @@
     <h1>Live Emotion Detection</h1>
 
     <div class="video-container">
-        <!-- The video stream endpoint is linked here -->
-        <img src="{{ url_for('video_feed') }}" alt="Live Video Feed">
+        <!-- Hidden video element to capture the webcam -->
+        <video id="webcam" autoplay playsinline></video>
+
+        <!-- The processed image will be shown here -->
+        <img id="processedImage" alt="Live Emotion Processing..." src="">
     </div>
 
     <div class="info">
-        Ensure your webcam is connected and allowed by the browser.
+        <p id="status">Waiting for webcam permission...</p>
+        Ensure your webcam is connected and you explicitly allow browser access when prompted.
     </div>
+
+    <script>
+        const video = document.getElementById('webcam');
+        const processedImage = document.getElementById('processedImage');
+        const status = document.getElementById('status');
+
+        // Use a hidden canvas to grab frames
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+
+        // Target processing framerate (around 10 FPS to save server resources)
+        const FPS = 10;
+        let isProcessing = false;
+
+        async function initCamera() {
+            try {
+                // Request webcam access from the browser
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                video.srcObject = stream;
+
+                video.onloadedmetadata = () => {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    status.innerText = "Webcam active. Processing emotions...";
+                    status.style.color = "#4CAF50";
+                    startProcessing();
+                };
+            } catch (err) {
+                console.error("Error accessing webcam: ", err);
+                status.innerText = "Error accessing webcam. Please allow permission or check connection.";
+                status.style.color = "#ff4444";
+            }
+        }
+
+        async function processFrame() {
+            if (isProcessing || video.paused || video.ended) {
+                return;
+            }
+
+            isProcessing = true;
+
+            // Draw current video frame to canvas
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            // Convert to slim jpeg base64
+            const imageData = canvas.toDataURL('image/jpeg', 0.5);
+
+            try {
+                // Send frame to server
+                const response = await fetch('/process_frame', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: imageData })
+                });
+
+                const data = await response.json();
+
+                if (data.success && data.image) {
+                    processedImage.src = data.image; // Display the returned processed frame
+                }
+            } catch (err) {
+                console.error("Frame processing error:", err);
+            } finally {
+                // Done processing, allow next frame
+                isProcessing = false;
+            }
+        }
+
+        function startProcessing() {
+            // Loop processing
+            setInterval(processFrame, 1000 / FPS);
+        }
+
+        // Start everything
+        initCamera();
+
+    </script>
 </body>
 
 </html>

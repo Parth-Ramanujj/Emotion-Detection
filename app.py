@@ -1,5 +1,7 @@
-from flask import Flask, render_template, Response
+from flask import Flask, render_template, request, jsonify
 import cv2
+import numpy as np
+import base64
 from utils import process_frame
 
 app = Flask(__name__)
@@ -13,29 +15,37 @@ def index():
 def favicon():
     return '', 204
 
-def gen_frames():
-    # Capture video from standard webcam (index 0)
-    cap = cv2.VideoCapture(0)
-    while True:
-        success, frame = cap.read()
-        if not success:
-            break
-        else:
+@app.route('/process_frame', methods=['POST'])
+def process_frame_route():
+    try:
+        # Get the base64 encoded image from the request
+        data = request.json['image']
+        # Remove the "data:image/jpeg;base64," prefix
+        img_data = base64.b64decode(data.split(',')[1])
+        
+        # Convert to numpy array
+        nparr = np.frombuffer(img_data, np.uint8)
+        # Decode into cv2 frame
+        frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        
+        if frame is not None:
             # Process the frame for emotion detection
-            frame = process_frame(frame)
+            processed_frame = process_frame(frame)
             
-            # Encode frame to JPEG
-            ret, buffer = cv2.imencode('.jpg', frame)
-            frame = buffer.tobytes()
+            # Encode frame back to JPEG
+            _, buffer = cv2.imencode('.jpg', processed_frame)
+            # Convert to base64 string
+            processed_base64 = base64.b64encode(buffer).decode('utf-8')
             
-            # Yield the next frame over the HTTP stream
-            yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
-
-# Route for streaming video frames
-@app.route('/video_feed')
-def video_feed():
-    return Response(gen_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
+            return jsonify({
+                'success': True,
+                'image': f'data:image/jpeg;base64,{processed_base64}'
+            })
+            
+    except Exception as e:
+        print(f"Error processing frame: {e}")
+        
+    return jsonify({'success': False})
 
 if __name__ == '__main__':
     # Run the app locally on port 5000
