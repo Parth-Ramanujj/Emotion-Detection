@@ -12,8 +12,10 @@ prediction_history = collections.deque(maxlen=7)
 
 # Load model safely
 try:
+    import os
+    model_path = os.path.join(os.path.dirname(__file__), "model", "fer2013_mini_XCEPTION.102-0.66.hdf5")
     model = tf.keras.models.load_model(
-        "emotion-web-app\model\emotion_model.keras",
+        model_path,
         compile=False
     )
 except Exception as e:

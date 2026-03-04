@@ -39,6 +39,10 @@ class VideoProcessor(VideoProcessorBase):
         # store frames
         self.frames.append(processed_img)
 
+        # Cap memory buffer to the last 150 frames (approx 5-10 sec of video) to prevent server RAM crash 
+        if len(self.frames) > 150:
+            self.frames = self.frames[-150:]
+
         return av.VideoFrame.from_ndarray(processed_img, format="bgr24")
 
 
